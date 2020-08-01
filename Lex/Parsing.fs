@@ -84,12 +84,26 @@ type Parser<'a> =
     { parserFn: InputState -> Result<'a * InputState>
       label: ParserLabel }
 
-let runOnInput (parser:Parser<'a>) input =
+let runOnInput parser input =
     parser.parserFn input
 
 /// Run a parser with some input.
 let run parser input =
     runOnInput parser (fromString input)
+
+
+let createParserForwardedToRef<'a>() =   
+    let dummyParser =
+        let innerFn input : Result<'a * InputState> = failwith "unfixed forwarded parser"
+        { parserFn = innerFn; label = "unknown" }
+        
+    let parserRef = ref dummyParser
+    
+    let innerFn input =
+        runOnInput !parserRef input
+    let wrapperParser = {parserFn = innerFn; label = "unknown"}
+    
+    wrapperParser, parserRef
 
 // ==================================
 // Errors
@@ -185,6 +199,14 @@ let (<!>) = mapParser
 
 /// "Piping" version of mapParser
 let (|>>) x f = mapParser f x
+
+let (>>%) parser x =
+    parser |>> (fun _ -> x)
+
+let (|>?) opt f =
+    match opt with
+    | None -> ""
+    | Some x -> f x
 
 /// Apply a wrapped function to a wrapped value.
 let applyParser fP xP =
